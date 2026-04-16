@@ -13,6 +13,7 @@
     <Description>A lightweight Windows system-tray app for cycling between audio playback devices using a global hotkey.</Description>
     <Platforms>AnyCPU</Platforms>
     <StartupObject>RoosterAudioSwitcher.Program</StartupObject>
+    <ApplicationIcon>Resources\Icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

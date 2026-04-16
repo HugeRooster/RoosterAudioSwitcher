@@ -67,11 +67,23 @@ namespace RoosterAudioSwitcher.Forms
                 Width = 200,
                 Text = "Ctrl+Alt+D"
             };
+            var lblThirdHotkey = new Label
+            {
+                Text = "Third Device Hotkey:",
+                AutoSize = true,
+                Location = new Point(10, 160)
+            };
+            txtThirdHotKey = new TextBox
+            {
+                Location = new Point(10, 190),
+                Width = 200,
+                Text = "Ctrl+Alt+F"
+            };
             var lblHotkeyHelp = new Label
             {
                 Text = "Supported modifiers: Ctrl, Alt, Shift, Windows",
                 AutoSize = true,
-                Location = new Point(10, 160),
+                Location = new Point(10, 230),
                 ForeColor = Color.Gray,
                 Font = new Font(Font, FontStyle.Italic)
             };
@@ -79,6 +91,8 @@ namespace RoosterAudioSwitcher.Forms
             tabHotkey.Controls.Add(txtSwitchHotKey);
             tabHotkey.Controls.Add(lblReturnHotkey);
             tabHotkey.Controls.Add(txtReturnHotKey);
+            tabHotkey.Controls.Add(lblThirdHotkey);
+            tabHotkey.Controls.Add(txtThirdHotKey);
             tabHotkey.Controls.Add(lblHotkeyHelp);
 
             // ===== Devices Tab =====
@@ -113,11 +127,23 @@ namespace RoosterAudioSwitcher.Forms
                 Width = 350,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
+            var lblThirdDevice = new Label
+            {
+                Text = "Third device:",
+                AutoSize = true,
+                Location = new Point(10, 114)
+            };
+            cmbThirdDevice = new ComboBox
+            {
+                Location = new Point(120, 110),
+                Width = 350,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
             lstDevices = new ListBox
             {
-                Location = new Point(10, 112),
+                Location = new Point(10, 146),
                 Width = 460,
-                Height = 140
+                Height = 106
             };
             BtnRefreshDevices = new Button
             {
@@ -138,6 +164,8 @@ namespace RoosterAudioSwitcher.Forms
             tabDevices.Controls.Add(cmbSwitchDevice);
             tabDevices.Controls.Add(lblDefaultDevice);
             tabDevices.Controls.Add(cmbDefaultDevice);
+            tabDevices.Controls.Add(lblThirdDevice);
+            tabDevices.Controls.Add(cmbThirdDevice);
             tabDevices.Controls.Add(lstDevices);
             tabDevices.Controls.Add(BtnRefreshDevices);
             tabDevices.Controls.Add(BtnTestSwitch);
@@ -205,9 +233,11 @@ namespace RoosterAudioSwitcher.Forms
 
         private TextBox? txtSwitchHotKey;
         private TextBox? txtReturnHotKey;
+        private TextBox? txtThirdHotKey;
         private ListBox? lstDevices;
         private ComboBox? cmbSwitchDevice;
         private ComboBox? cmbDefaultDevice;
+        private ComboBox? cmbThirdDevice;
         private CheckBox? chkStartWithWindows;
         private CheckBox? chkShowNotifications;
         private Button? BtnRefreshDevices;

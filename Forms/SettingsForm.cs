@@ -22,7 +22,24 @@ namespace RoosterAudioSwitcher.Forms
             _hotkeyManager = hotkeyManager;
 
             InitializeComponent();
+            ApplyWindowIcon();
             LoadSettings();
+        }
+
+        private void ApplyWindowIcon()
+        {
+            try
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                if (icon != null)
+                {
+                    Icon = icon;
+                }
+            }
+            catch
+            {
+                // Keep default icon if extraction fails.
+            }
         }
 
         /// <summary>
@@ -33,6 +50,7 @@ namespace RoosterAudioSwitcher.Forms
             // Load hotkeys
             txtSwitchHotKey!.Text = _configManager.Settings.SwitchToDeviceHotKey;
             txtReturnHotKey!.Text = _configManager.Settings.ReturnToDefaultHotKey;
+            txtThirdHotKey!.Text = _configManager.Settings.ThirdDeviceHotKey;
 
             // Load startup with Windows setting
             chkStartWithWindows!.Checked = _configManager.Settings.StartWithWindows;
@@ -51,6 +69,11 @@ namespace RoosterAudioSwitcher.Forms
                 SelectComboByDeviceId(cmbDefaultDevice, _configManager.Settings.DefaultDeviceId);
             }
 
+            if (!string.IsNullOrWhiteSpace(_configManager.Settings.ThirdDeviceId))
+            {
+                SelectComboByDeviceId(cmbThirdDevice, _configManager.Settings.ThirdDeviceId);
+            }
+
             // Load notification setting
             chkShowNotifications!.Checked = _configManager.Settings.ShowNotifications;
         }
@@ -63,6 +86,7 @@ namespace RoosterAudioSwitcher.Forms
             lstDevices!.Items.Clear();
             cmbSwitchDevice!.Items.Clear();
             cmbDefaultDevice!.Items.Clear();
+            cmbThirdDevice!.Items.Clear();
             var devices = _audioDeviceManager.GetDevices();
 
             foreach (var device in devices)
@@ -70,6 +94,7 @@ namespace RoosterAudioSwitcher.Forms
                 lstDevices.Items.Add(device);
                 cmbSwitchDevice.Items.Add(device);
                 cmbDefaultDevice.Items.Add(device);
+                cmbThirdDevice.Items.Add(device);
             }
 
             // Default selections if not yet configured
@@ -87,6 +112,11 @@ namespace RoosterAudioSwitcher.Forms
             {
                 cmbDefaultDevice.SelectedIndex = 0;
             }
+
+            if (cmbThirdDevice.Items.Count > 0 && cmbThirdDevice.SelectedIndex < 0)
+            {
+                cmbThirdDevice.SelectedIndex = 0;
+            }
         }
 
         /// <summary>
@@ -97,16 +127,19 @@ namespace RoosterAudioSwitcher.Forms
             // Validate and save hotkeys
             string switchHotKey = txtSwitchHotKey?.Text?.Trim() ?? string.Empty;
             string returnHotKey = txtReturnHotKey?.Text?.Trim() ?? string.Empty;
+            string thirdHotKey = txtThirdHotKey?.Text?.Trim() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(switchHotKey) || string.IsNullOrWhiteSpace(returnHotKey))
+            if (string.IsNullOrWhiteSpace(switchHotKey) || string.IsNullOrWhiteSpace(returnHotKey) || string.IsNullOrWhiteSpace(thirdHotKey))
             {
-                MessageBox.Show("Both hotkeys are required.", "Invalid Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("All three hotkeys are required.", "Invalid Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            if (string.Equals(switchHotKey, returnHotKey, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(switchHotKey, returnHotKey, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(switchHotKey, thirdHotKey, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(returnHotKey, thirdHotKey, StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Switch and Return hotkeys must be different.", "Invalid Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Switch, Return, and Third hotkeys must all be different.", "Invalid Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -119,6 +152,12 @@ namespace RoosterAudioSwitcher.Forms
             if (cmbDefaultDevice?.SelectedItem is not AudioDevice defaultDevice)
             {
                 MessageBox.Show("Please select the default device to return to.", "Missing Device", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (cmbThirdDevice?.SelectedItem is not AudioDevice thirdDevice)
+            {
+                MessageBox.Show("Please select the third device.", "Missing Device", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -135,12 +174,20 @@ namespace RoosterAudioSwitcher.Forms
                 return;
             }
 
+            if (!_hotkeyManager.RegisterThirdHotKey(thirdHotKey))
+            {
+                MessageBox.Show("Failed to register third hotkey. Please use format like 'Ctrl+Alt+F'.", "Invalid Hotkey", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             // Save settings
             _configManager.Settings.SwitchToDeviceHotKey = switchHotKey;
             _configManager.Settings.ReturnToDefaultHotKey = returnHotKey;
+            _configManager.Settings.ThirdDeviceHotKey = thirdHotKey;
             _configManager.Settings.HotKey = switchHotKey;
             _configManager.Settings.SwitchToDeviceId = switchDevice.Id;
             _configManager.Settings.DefaultDeviceId = defaultDevice.Id;
+            _configManager.Settings.ThirdDeviceId = thirdDevice.Id;
             _configManager.Settings.StartWithWindows = chkStartWithWindows?.Checked ?? false;
             _configManager.Settings.ShowNotifications = chkShowNotifications?.Checked ?? false;
 

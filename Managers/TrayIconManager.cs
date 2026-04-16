@@ -176,11 +176,11 @@ namespace RoosterAudioSwitcher.Managers
         {
             try
             {
-                // Try to load icon from Resources folder
-                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Icon.ico");
-                if (File.Exists(iconPath))
+                // Prefer the icon embedded in the executable.
+                var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                if (exeIcon != null)
                 {
-                    return new Icon(iconPath);
+                    return exeIcon;
                 }
             }
             catch (Exception ex)

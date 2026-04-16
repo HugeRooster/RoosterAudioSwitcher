@@ -63,6 +63,11 @@ namespace RoosterAudioSwitcher.Managers
                         settings.ReturnToDefaultHotKey = "Ctrl+Alt+D";
                     }
 
+                    if (string.IsNullOrWhiteSpace(settings.ThirdDeviceHotKey))
+                    {
+                        settings.ThirdDeviceHotKey = "Ctrl+Alt+F";
+                    }
+
                     return settings;
                 }
                 catch (Exception ex)

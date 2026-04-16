@@ -23,6 +23,11 @@ namespace RoosterAudioSwitcher.Models
         public string ReturnToDefaultHotKey { get; set; } = "Ctrl+Alt+D";
 
         /// <summary>
+        /// Hotkey used to switch to the configured third device.
+        /// </summary>
+        public string ThirdDeviceHotKey { get; set; } = "Ctrl+Alt+F";
+
+        /// <summary>
         /// Device ID to switch to when the switch hotkey is pressed.
         /// </summary>
         public string? SwitchToDeviceId { get; set; }
@@ -31,6 +36,11 @@ namespace RoosterAudioSwitcher.Models
         /// Device ID to switch back to when the return hotkey is pressed.
         /// </summary>
         public string? DefaultDeviceId { get; set; }
+
+        /// <summary>
+        /// Device ID to switch to when the third-device hotkey is pressed.
+        /// </summary>
+        public string? ThirdDeviceId { get; set; }
 
         /// <summary>
         /// List of device IDs in the preferred cycle order.

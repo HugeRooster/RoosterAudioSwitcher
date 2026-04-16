@@ -61,6 +61,8 @@ namespace RoosterAudioSwitcher
                 _hotkeyManager.RegisterSwitchHotKey(_configManager.Settings.SwitchToDeviceHotKey);
                 Logger.Log($"Main: Registering return hotkey: {_configManager.Settings.ReturnToDefaultHotKey}");
                 _hotkeyManager.RegisterReturnHotKey(_configManager.Settings.ReturnToDefaultHotKey);
+                Logger.Log($"Main: Registering third hotkey: {_configManager.Settings.ThirdDeviceHotKey}");
+                _hotkeyManager.RegisterThirdHotKey(_configManager.Settings.ThirdDeviceHotKey);
 
                 // Load initial device list into tray menu
                 Logger.Log("Main: Updating tray menu...");
@@ -147,6 +149,34 @@ namespace RoosterAudioSwitcher
                 else
                 {
                     Logger.LogError("Return hotkey: failed to switch device");
+                }
+            };
+
+            // Third hotkey pressed -> switch to configured third device.
+            _hotkeyManager.ThirdHotKeyPressed += (s, e) =>
+            {
+                Logger.Log(">>> THIRD HOTKEY HANDLER FIRED <<<");
+                var thirdDevice = ResolveDeviceById(_configManager?.Settings.ThirdDeviceId);
+                if (thirdDevice == null)
+                {
+                    Logger.LogError("Third hotkey: third device is not configured or not found.");
+                    return;
+                }
+
+                Logger.Log($"Third hotkey: switching to {thirdDevice.FriendlyName}");
+                if (_audioDeviceManager.SetDefaultDevice(thirdDevice))
+                {
+                    UpdateTrayMenu();
+
+                    if (_configManager?.Settings.ShowNotifications ?? false)
+                    {
+                        _notificationManager.ShowDeviceChangeNotification(thirdDevice.FriendlyName);
+                        _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {thirdDevice.FriendlyName}");
+                    }
+                }
+                else
+                {
+                    Logger.LogError("Third hotkey: failed to switch device");
                 }
             };
 

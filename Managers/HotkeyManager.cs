@@ -18,6 +18,7 @@ namespace RoosterAudioSwitcher.Managers
         private const int MOD_WIN = 0x0008;
         private const int HOTKEY_ID_SWITCH = 9000;
         private const int HOTKEY_ID_RETURN = 9001;
+        private const int HOTKEY_ID_THIRD = 9002;
 
         [DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -31,12 +32,14 @@ namespace RoosterAudioSwitcher.Managers
         private HotkeyMessageWindow? _messageWindow;
         private string? _switchHotKeyString;
         private string? _returnHotKeyString;
+        private string? _thirdHotKeyString;
 
         /// <summary>
         /// Fired when the registered global hotkey is pressed.
         /// </summary>
         public event EventHandler? SwitchHotKeyPressed;
         public event EventHandler? ReturnHotKeyPressed;
+        public event EventHandler? ThirdHotKeyPressed;
 
         public HotkeyManager()
         {
@@ -65,6 +68,11 @@ namespace RoosterAudioSwitcher.Managers
         public bool RegisterReturnHotKey(string hotKeyString)
         {
             return RegisterHotKeyInternal(hotKeyString, HOTKEY_ID_RETURN, "return", value => _returnHotKeyString = value);
+        }
+
+        public bool RegisterThirdHotKey(string hotKeyString)
+        {
+            return RegisterHotKeyInternal(hotKeyString, HOTKEY_ID_THIRD, "third", value => _thirdHotKeyString = value);
         }
 
         private bool RegisterHotKeyInternal(string hotKeyString, int hotkeyId, string label, Action<string?> setCurrent)
@@ -163,8 +171,10 @@ namespace RoosterAudioSwitcher.Managers
         {
             UnregisterHotKey(HOTKEY_ID_SWITCH);
             UnregisterHotKey(HOTKEY_ID_RETURN);
+            UnregisterHotKey(HOTKEY_ID_THIRD);
             _switchHotKeyString = null;
             _returnHotKeyString = null;
+            _thirdHotKeyString = null;
         }
 
         private void UnregisterHotKey(int hotkeyId)
@@ -188,6 +198,7 @@ namespace RoosterAudioSwitcher.Managers
         /// </summary>
         public string? GetSwitchHotKeyString() => _switchHotKeyString;
         public string? GetReturnHotKeyString() => _returnHotKeyString;
+        public string? GetThirdHotKeyString() => _thirdHotKeyString;
 
         /// <summary>
         /// Internal method called when the hotkey is pressed.
@@ -202,6 +213,10 @@ namespace RoosterAudioSwitcher.Managers
             else if (hotkeyId == HOTKEY_ID_RETURN)
             {
                 ReturnHotKeyPressed?.Invoke(this, EventArgs.Empty);
+            }
+            else if (hotkeyId == HOTKEY_ID_THIRD)
+            {
+                ThirdHotKeyPressed?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -222,6 +237,7 @@ namespace RoosterAudioSwitcher.Managers
         private const int WM_HOTKEY = 0x0312;
         private const int HOTKEY_ID_SWITCH = 9000;
         private const int HOTKEY_ID_RETURN = 9001;
+        private const int HOTKEY_ID_THIRD = 9002;
 
         public HotkeyMessageWindow(HotkeyManager hotkeyManager)
         {
@@ -242,7 +258,7 @@ namespace RoosterAudioSwitcher.Managers
             if (m.Msg == WM_HOTKEY)
             {
                 Logger.Log($"WndProc: Received WM_HOTKEY message (wParam={m.WParam})");
-                if (m.WParam.ToInt32() == HOTKEY_ID_SWITCH || m.WParam.ToInt32() == HOTKEY_ID_RETURN)
+                if (m.WParam.ToInt32() == HOTKEY_ID_SWITCH || m.WParam.ToInt32() == HOTKEY_ID_RETURN || m.WParam.ToInt32() == HOTKEY_ID_THIRD)
                 {
                     Logger.Log("WndProc: HOTKEY_ID matched! Calling OnHotKeyPressed");
                     _hotkeyManager.OnHotKeyPressed(m.WParam.ToInt32());
