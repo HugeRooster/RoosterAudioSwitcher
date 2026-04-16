@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <AssemblyName>RoosterAudioSwitcher</AssemblyName>
+    <RootNamespace>RoosterAudioSwitcher</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>Your Name</Authors>
+    <Description>A lightweight Windows system-tray app for cycling between audio playback devices using a global hotkey.</Description>
+    <Platforms>AnyCPU</Platforms>
+    <StartupObject>RoosterAudioSwitcher.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Audio and Audio Management -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
+
+</Project>
