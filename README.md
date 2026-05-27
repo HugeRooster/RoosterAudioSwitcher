@@ -24,17 +24,26 @@ RoosterAudioSwitcher is a Windows tray utility for quickly switching playback de
 - Return hotkey: Ctrl+Alt+D
 - Third hotkey: Ctrl+Alt+F
 
+## Download
+
+Pre-built portable releases for Windows x64 are available on the [Releases](https://github.com/HugeRooster/RoosterAudioSwitcher/releases) page.
+
+1. Download `RoosterAudioSwitcher-<version>-win-x64-portable.zip`.
+2. Extract to any folder.
+3. Run `RoosterAudioSwitcher.exe`.
+
+> **Prerequisite:** [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) must be installed.
+
 ## Requirements
 
 - Windows 10/11
-- .NET 8 SDK for development
-- .NET 8 runtime to run published binaries
+- .NET 10 SDK for development
+- .NET 10 Desktop Runtime to run published binaries
 
 ## Tech Stack
 
-- .NET 8 (WinForms)
-- NAudio 2.2.1
-- NAudio.Wasapi 2.2.1
+- .NET 10 (WinForms)
+- NAudio 2.3.0
 
 ## Build and Run
 
@@ -47,7 +56,7 @@ dotnet run -c Release
 Release executable:
 
 ```text
-bin/Release/net8.0-windows/RoosterAudioSwitcher.exe
+bin/Release/net10.0-windows/RoosterAudioSwitcher.exe
 ```
 
 ## Configuration
@@ -76,6 +85,7 @@ Important settings keys:
 RoosterAudioSwitcher/
    .github/workflows/
       dotnet-ci.yml
+      release.yml
    Forms/
       SettingsForm.cs
       SettingsForm.Designer.cs
@@ -102,7 +112,8 @@ RoosterAudioSwitcher/
 ## GitHub / CI
 
 - License: MIT
-- CI workflow: .github/workflows/dotnet-ci.yml
+- CI workflow: [.github/workflows/dotnet-ci.yml](.github/workflows/dotnet-ci.yml) — builds on every push/PR to `main`
+- Release workflow: [.github/workflows/release.yml](.github/workflows/release.yml) — triggered by `v*` tags, publishes a draft release with portable zip and SHA256 checksum
 - Branch: main
 
 ## Notes
