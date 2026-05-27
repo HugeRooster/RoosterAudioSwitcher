@@ -1,4 +1,4 @@
-#nullable disable
+#nullable enable
 
 using System;
 using System.Windows.Forms;
@@ -8,7 +8,7 @@ namespace RoosterAudioSwitcher.Forms
 {
     partial class SettingsForm
     {
-        private System.ComponentModel.IContainer components = null;
+        private System.ComponentModel.IContainer? components = null;
 
         protected override void Dispose(bool disposing)
         {

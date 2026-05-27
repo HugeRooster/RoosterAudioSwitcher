@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using System.Windows.Input;
 
 namespace RoosterAudioSwitcher.Managers
 {
@@ -181,9 +180,10 @@ namespace RoosterAudioSwitcher.Managers
         {
             try
             {
-                if (_messageWindow?.Handle != IntPtr.Zero)
+                var window = _messageWindow;
+                if (window is not null && window.Handle != IntPtr.Zero)
                 {
-                    UnregisterHotKey(_messageWindow.Handle, hotkeyId);
+                    UnregisterHotKey(window.Handle, hotkeyId);
                     Logger.Log($"Hotkey {hotkeyId} unregistered successfully");
                 }
             }

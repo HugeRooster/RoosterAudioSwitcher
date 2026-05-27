@@ -192,7 +192,7 @@ namespace RoosterAudioSwitcher.Forms
             _configManager.Settings.ShowNotifications = chkShowNotifications?.Checked ?? false;
 
             // Apply startup setting
-            if (chkStartWithWindows.Checked)
+            if (chkStartWithWindows?.Checked == true)
             {
                 EnableStartupWithWindows();
             }
