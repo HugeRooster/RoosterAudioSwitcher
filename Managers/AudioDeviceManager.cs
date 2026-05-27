@@ -152,10 +152,9 @@ namespace RoosterAudioSwitcher.Managers
                     return false;
                 }
 
-                // Small delay to allow Windows to process the change
-                System.Threading.Thread.Sleep(100);
-
-                // Update device list to reflect new default
+                // Update device list to reflect new default.
+                // No explicit sleep needed — AudioDeviceHelper.SetDefaultDevice already
+                // verifies the endpoint change internally with its own retry loop.
                 RefreshDeviceList();
 
                 var newDefault = _devices.FirstOrDefault(d => d.Id == device.Id);
@@ -219,22 +218,6 @@ namespace RoosterAudioSwitcher.Managers
             catch
             {
                 return string.Empty;
-            }
-        }
-
-        /// <summary>
-        /// Sets the default playback device using the Windows Policy Config interface (COM).
-        /// This is more reliable than using NAudio's device methods for setting defaults.
-        /// </summary>
-        private void SetDefaultDeviceViaPolicy(string deviceId)
-        {
-            try
-            {
-                AudioDeviceHelper.SetDefaultDevice(deviceId);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error setting default via policy: {ex.Message}");
             }
         }
 

@@ -99,84 +99,105 @@ namespace RoosterAudioSwitcher
             // Switch hotkey pressed -> switch to configured target device.
             _hotkeyManager.SwitchHotKeyPressed += (s, e) =>
             {
-                Logger.Log(">>> SWITCH HOTKEY HANDLER FIRED <<<");
-                var targetDevice = ResolveDeviceById(_configManager?.Settings.SwitchToDeviceId);
-                if (targetDevice == null)
+                try
                 {
-                    Logger.LogError("Switch hotkey: target device is not configured or not found.");
-                    return;
-                }
-
-                Logger.Log($"Switch hotkey: switching to {targetDevice.FriendlyName}");
-                if (_audioDeviceManager.SetDefaultDevice(targetDevice))
-                {
-                    UpdateTrayMenu();
-
-                    if (_configManager?.Settings.ShowNotifications ?? false)
+                    Logger.Log(">>> SWITCH HOTKEY HANDLER FIRED <<<");
+                    var targetDevice = ResolveDeviceById(_configManager?.Settings.SwitchToDeviceId);
+                    if (targetDevice == null)
                     {
-                        _notificationManager.ShowDeviceChangeNotification(targetDevice.FriendlyName);
-                        _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {targetDevice.FriendlyName}");
+                        Logger.LogError("Switch hotkey: target device is not configured or not found.");
+                        return;
+                    }
+
+                    Logger.Log($"Switch hotkey: switching to {targetDevice.FriendlyName}");
+                    if (_audioDeviceManager.SetDefaultDevice(targetDevice))
+                    {
+                        UpdateTrayMenu();
+
+                        if (_configManager?.Settings.ShowNotifications ?? false)
+                        {
+                            _notificationManager.ShowDeviceChangeNotification(targetDevice.FriendlyName);
+                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {targetDevice.FriendlyName}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Switch hotkey: failed to switch device");
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logger.LogError("Switch hotkey: failed to switch device");
+                    Logger.LogError("Switch hotkey: unhandled exception", ex);
                 }
             };
 
             // Return hotkey pressed -> switch back to configured default device.
             _hotkeyManager.ReturnHotKeyPressed += (s, e) =>
             {
-                Logger.Log(">>> RETURN HOTKEY HANDLER FIRED <<<");
-                var defaultDevice = ResolveDeviceById(_configManager?.Settings.DefaultDeviceId);
-                if (defaultDevice == null)
+                try
                 {
-                    Logger.LogError("Return hotkey: default device is not configured or not found.");
-                    return;
-                }
-
-                Logger.Log($"Return hotkey: switching to {defaultDevice.FriendlyName}");
-                if (_audioDeviceManager.SetDefaultDevice(defaultDevice))
-                {
-                    UpdateTrayMenu();
-
-                    if (_configManager?.Settings.ShowNotifications ?? false)
+                    Logger.Log(">>> RETURN HOTKEY HANDLER FIRED <<<");
+                    var defaultDevice = ResolveDeviceById(_configManager?.Settings.DefaultDeviceId);
+                    if (defaultDevice == null)
                     {
-                        _notificationManager.ShowDeviceChangeNotification(defaultDevice.FriendlyName);
-                        _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {defaultDevice.FriendlyName}");
+                        Logger.LogError("Return hotkey: default device is not configured or not found.");
+                        return;
+                    }
+
+                    Logger.Log($"Return hotkey: switching to {defaultDevice.FriendlyName}");
+                    if (_audioDeviceManager.SetDefaultDevice(defaultDevice))
+                    {
+                        UpdateTrayMenu();
+
+                        if (_configManager?.Settings.ShowNotifications ?? false)
+                        {
+                            _notificationManager.ShowDeviceChangeNotification(defaultDevice.FriendlyName);
+                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {defaultDevice.FriendlyName}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Return hotkey: failed to switch device");
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logger.LogError("Return hotkey: failed to switch device");
+                    Logger.LogError("Return hotkey: unhandled exception", ex);
                 }
             };
 
             // Third hotkey pressed -> switch to configured third device.
             _hotkeyManager.ThirdHotKeyPressed += (s, e) =>
             {
-                Logger.Log(">>> THIRD HOTKEY HANDLER FIRED <<<");
-                var thirdDevice = ResolveDeviceById(_configManager?.Settings.ThirdDeviceId);
-                if (thirdDevice == null)
+                try
                 {
-                    Logger.LogError("Third hotkey: third device is not configured or not found.");
-                    return;
-                }
-
-                Logger.Log($"Third hotkey: switching to {thirdDevice.FriendlyName}");
-                if (_audioDeviceManager.SetDefaultDevice(thirdDevice))
-                {
-                    UpdateTrayMenu();
-
-                    if (_configManager?.Settings.ShowNotifications ?? false)
+                    Logger.Log(">>> THIRD HOTKEY HANDLER FIRED <<<");
+                    var thirdDevice = ResolveDeviceById(_configManager?.Settings.ThirdDeviceId);
+                    if (thirdDevice == null)
                     {
-                        _notificationManager.ShowDeviceChangeNotification(thirdDevice.FriendlyName);
-                        _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {thirdDevice.FriendlyName}");
+                        Logger.LogError("Third hotkey: third device is not configured or not found.");
+                        return;
+                    }
+
+                    Logger.Log($"Third hotkey: switching to {thirdDevice.FriendlyName}");
+                    if (_audioDeviceManager.SetDefaultDevice(thirdDevice))
+                    {
+                        UpdateTrayMenu();
+
+                        if (_configManager?.Settings.ShowNotifications ?? false)
+                        {
+                            _notificationManager.ShowDeviceChangeNotification(thirdDevice.FriendlyName);
+                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {thirdDevice.FriendlyName}");
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Third hotkey: failed to switch device");
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logger.LogError("Third hotkey: failed to switch device");
+                    Logger.LogError("Third hotkey: unhandled exception", ex);
                 }
             };
 

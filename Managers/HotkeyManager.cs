@@ -81,7 +81,7 @@ namespace RoosterAudioSwitcher.Managers
                 Logger.Log($"RegisterHotKey ({label}) called with: {hotKeyString}");
                 
                 // Unregister old hotkey if it exists
-                UnregisterHotKey(hotkeyId);
+                UnregisterHotKeyById(hotkeyId);
 
                 if (_messageWindow == null)
                 {
@@ -164,19 +164,19 @@ namespace RoosterAudioSwitcher.Managers
         public bool RegisterHotKey(string hotKeyString) => RegisterSwitchHotKey(hotKeyString);
 
         /// <summary>
-        /// Unregisters the current global hotkey.
+        /// Unregisters all registered global hotkeys.
         /// </summary>
-        public void UnregisterHotKey()
+        public void UnregisterAllHotkeys()
         {
-            UnregisterHotKey(HOTKEY_ID_SWITCH);
-            UnregisterHotKey(HOTKEY_ID_RETURN);
-            UnregisterHotKey(HOTKEY_ID_THIRD);
+            UnregisterHotKeyById(HOTKEY_ID_SWITCH);
+            UnregisterHotKeyById(HOTKEY_ID_RETURN);
+            UnregisterHotKeyById(HOTKEY_ID_THIRD);
             _switchHotKeyString = null;
             _returnHotKeyString = null;
             _thirdHotKeyString = null;
         }
 
-        private void UnregisterHotKey(int hotkeyId)
+        private void UnregisterHotKeyById(int hotkeyId)
         {
             try
             {
@@ -222,7 +222,7 @@ namespace RoosterAudioSwitcher.Managers
 
         public void Dispose()
         {
-            UnregisterHotKey();
+            UnregisterAllHotkeys();
             _messageWindow?.Dispose();
             GC.SuppressFinalize(this);
         }
