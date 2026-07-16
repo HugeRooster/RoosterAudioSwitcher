@@ -22,5 +22,8 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Audit dependencies for vulnerabilities
+        run: dotnet audit
+
       - name: Build (Release)
         run: dotnet build --configuration Release --no-restore

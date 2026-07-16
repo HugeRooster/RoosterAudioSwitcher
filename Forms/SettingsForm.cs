@@ -219,6 +219,7 @@ namespace RoosterAudioSwitcher.Forms
 
         /// <summary>
         /// Enables startup with Windows by adding a registry entry.
+        /// Verifies the value was written correctly after setting it.
         /// </summary>
         private void EnableStartupWithWindows()
         {
@@ -227,8 +228,24 @@ namespace RoosterAudioSwitcher.Forms
                 string exePath = Application.ExecutablePath;
                 Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Run", true) ?? throw new InvalidOperationException("Could not open registry key");
+
+                // Validate the executable path before writing (prevent injection of malicious paths).
+                if (!IsValidRegistryPath(exePath))
+                {
+                    MessageBox.Show("Invalid application path. Cannot enable startup.", "Startup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
                 key.SetValue("RoosterAudioSwitcher", exePath);
                 key.Close();
+
+                // Verify the registry value was written correctly.
+                if (!VerifyRegistryValue("RoosterAudioSwitcher", exePath))
+                {
+                    MessageBox.Show(
+                        "Startup entry was created but could not be verified. The application may still start with Windows, but check your settings.",
+                        "Startup Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
@@ -238,6 +255,7 @@ namespace RoosterAudioSwitcher.Forms
 
         /// <summary>
         /// Disables startup with Windows by removing the registry entry.
+        /// Verifies the value was removed after deletion.
         /// </summary>
         private void DisableStartupWithWindows()
         {
@@ -245,13 +263,78 @@ namespace RoosterAudioSwitcher.Forms
             {
                 Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Run", true) ?? throw new InvalidOperationException("Could not open registry key");
-                key.DeleteValue("RoosterAudioSwitcher", false);
+
+                // Check if the value exists before attempting deletion.
+                object? existingValue = key.GetValue("RoosterAudioSwitcher");
+                if (existingValue != null)
+                {
+                    key.DeleteValue("RoosterAudioSwitcher", false);
+                }
+
                 key.Close();
+
+                // Verify the registry value was removed.
+                if (VerifyRegistryValue("RoosterAudioSwitcher", null))
+                {
+                    MessageBox.Show(
+                        "Startup entry could not be removed. It may be managed by group policy.",
+                        "Startup Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error disabling startup: {ex.Message}", "Startup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>
+        /// Verifies that a registry value exists and matches the expected value.
+        /// Returns true if verification passes (value matches when expectedValue is non-null, or value doesn't exist when expectedValue is null).
+        /// </summary>
+        private static bool VerifyRegistryValue(string valueName, string? expectedValue)
+        {
+            try
+            {
+                Microsoft.Win32.RegistryKey? key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Run", false);
+
+                if (key == null)
+                    return false;
+
+                object? actualValue = key.GetValue(valueName);
+                key.Close();
+
+                if (expectedValue == null)
+                {
+                    // Expecting the value to NOT exist.
+                    return actualValue == null;
+                }
+
+                // Expecting the value to exist and match.
+                string? actualString = actualValue as string;
+                return string.Equals(actualString, expectedValue, StringComparison.Ordinal);
+            }
+            catch
+            {
+                // If verification fails due to any error (e.g., access denied), assume failure.
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Validates that a file path is safe to write to the registry.
+        /// Checks for null, empty, and extreme length.
+        /// </summary>
+        private static bool IsValidRegistryPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            // Registry values have practical limits (~32KB), but we use a much stricter limit.
+            if (path.Length > 1024)
+                return false;
+
+            return true;
         }
 
         /// <summary>

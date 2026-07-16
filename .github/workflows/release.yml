@@ -43,6 +43,16 @@ jobs:
           $checksumFile = "SHA256SUMS.txt"
           "$hash  $zipName" | Out-File -FilePath $checksumFile -Encoding ascii
 
+          # Sign the checksum file with GPG if a signing key is available.
+          # The private key should be provided via the GPG_PRIVATE_KEY secret.
+          if (Test-Path env:GPG_PRIVATE_KEY) {
+            $gpgSignature = "SHA256SUMS.sig"
+            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+            $keyId = (gpg --list-keys --with-colons | Select-String '^pub:' | ForEach-Object { $_.Line -split ':' })[4]
+            gpg --batch --yes --armor --detach-sign --default-key $keyId -o $gpgSignature $checksumFile
+            "signature_name=$gpgSignature" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
           "zip_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "checksum_name=$checksumFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
@@ -54,3 +64,4 @@ jobs:
           files: |
             ${{ steps.package.outputs.zip_name }}
             ${{ steps.package.outputs.checksum_name }}
+            ${{ steps.package.outputs.signature_name || '' }}

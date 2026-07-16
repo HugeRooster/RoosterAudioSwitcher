@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -32,6 +33,22 @@ namespace RoosterAudioSwitcher.Managers
         private string? _switchHotKeyString;
         private string? _returnHotKeyString;
         private string? _thirdHotKeyString;
+
+        // Reserved/unregisterable hotkeys that Windows reserves for system use.
+        // RegisterHotKey will silently fail for these combinations.
+        private static readonly HashSet<string> ReservedHotkeyDenylist = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Ctrl+Alt+Del",
+            "Ctrl+Esc",
+            "Win+E",
+            "Win+L",
+            "Win+D",
+            "Win+M",
+            "Shift+Win+M",
+            "Alt+Esc",
+            "Alt+Tab",
+            "Ctrl+Shift+Esc",
+        };
 
         /// <summary>
         /// Fired when the registered global hotkey is pressed.
@@ -79,7 +96,14 @@ namespace RoosterAudioSwitcher.Managers
             try
             {
                 Logger.Log($"RegisterHotKey ({label}) called with: {hotKeyString}");
-                
+
+                // Check against reserved hotkey denylist before attempting registration.
+                if (ReservedHotkeyDenylist.Contains(hotKeyString))
+                {
+                    Logger.LogError($"RegisterHotKey ({label}): Hotkey '{hotKeyString}' is a reserved system combination and cannot be registered.");
+                    return false;
+                }
+
                 // Unregister old hotkey if it exists
                 UnregisterHotKeyById(hotkeyId);
 

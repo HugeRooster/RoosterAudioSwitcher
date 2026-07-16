@@ -75,7 +75,7 @@ namespace RoosterAudioSwitcher
             catch (Exception ex)
             {
                 Logger.LogError("Main: Fatal error during initialization", ex);
-                MessageBox.Show($"Fatal error during initialization: {ex.Message}\n\n{ex.StackTrace}",
+                MessageBox.Show($"Fatal error during initialization: {ex.Message}",
                     "RoosterAudioSwitcher - Startup Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);

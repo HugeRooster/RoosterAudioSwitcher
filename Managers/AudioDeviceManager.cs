@@ -322,11 +322,55 @@ namespace RoosterAudioSwitcher.Managers
             [PreserveSig] int SetEndpointVisibility([MarshalAs(UnmanagedType.LPWStr)] string wszDeviceId, int bVisible);
         }
 
+        private const int MaxDeviceIdLength = 512;
+
+        /// <summary>
+        /// Validates that a device ID has an acceptable format before passing it to COM APIs.
+        /// NAudio/WASAPI device IDs typically start with '{' (WASAPI endpoint GUID) or '\\?\'.
+        /// </summary>
+        private static bool IsValidDeviceId(string deviceId)
+        {
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return false;
+
+            if (deviceId.Length > MaxDeviceIdLength)
+            {
+                Logger.LogError($"SetDefaultDevice: Device ID exceeds maximum length of {MaxDeviceIdLength} characters");
+                return false;
+            }
+
+            // NAudio device IDs follow predictable patterns. Accept common formats:
+            // - WASAPI endpoint GUIDs: "{0.0.0.xxxxxxxx}" or "{0.0.1.xxxxxxxx}" etc.
+            // - Device setup class paths: "\\?\SWD#MMDEVAPI#..."
+            // - Legacy format IDs starting with '{'
+            char firstNonWhitespace = deviceId.TrimStart()[0];
+
+            if (firstNonWhitespace == '{')
+                return true;
+
+            // Check for Windows device path format: \?\...
+            const string DevicePathPrefix = "\\?\\";
+            if (deviceId.StartsWith(DevicePathPrefix, StringComparison.Ordinal))
+                return true;
+
+            // If it doesn't match known patterns, log a warning but allow it through.
+            // Some valid device IDs may not match these exact patterns on all Windows versions.
+            Logger.LogWarning($"SetDefaultDevice: Device ID does not match expected format (starts with '{firstNonWhitespace}'): {deviceId[..Math.Min(40, deviceId.Length)]}");
+            return true;
+        }
+
         public static bool SetDefaultDevice(string deviceId)
         {
             if (string.IsNullOrWhiteSpace(deviceId))
             {
                 Logger.LogError("SetDefaultDevice: Device ID is empty");
+                return false;
+            }
+
+            // Validate device ID format before passing to COM interop.
+            if (!IsValidDeviceId(deviceId))
+            {
+                Logger.LogError($"SetDefaultDevice: Invalid device ID format");
                 return false;
             }
 
