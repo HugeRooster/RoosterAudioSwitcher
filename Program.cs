@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Windows.Forms;
 using RoosterAudioSwitcher.Forms;
 using RoosterAudioSwitcher.Managers;
@@ -19,12 +20,30 @@ namespace RoosterAudioSwitcher
         private static ConfigManager? _configManager;
         private static SettingsForm? _settingsForm;
 
+        // Held for the lifetime of the process so the GC cannot release our
+        // ownership of the single-instance mutex while the app is running.
+        private static Mutex? _instanceMutex;
+
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
         static void Main()
         {
+            // Only one instance may run at a time. A second launch would create a
+            // duplicate tray icon and its hotkey registrations would silently fail.
+            _instanceMutex = new Mutex(true, @"Local\RoosterAudioSwitcher_SingleInstance", out bool isFirstInstance);
+            if (!isFirstInstance)
+            {
+                MessageBox.Show(
+                    "RoosterAudioSwitcher is already running. Look for its icon in the system tray.",
+                    "RoosterAudioSwitcher",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                _instanceMutex.Dispose();
+                Environment.Exit(0);
+            }
+
             // Enable high-DPI awareness for Windows 10+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -117,7 +136,6 @@ namespace RoosterAudioSwitcher
                         if (_configManager?.Settings.ShowNotifications ?? false)
                         {
                             _notificationManager.ShowDeviceChangeNotification(targetDevice.FriendlyName);
-                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {targetDevice.FriendlyName}");
                         }
                     }
                     else
@@ -152,7 +170,6 @@ namespace RoosterAudioSwitcher
                         if (_configManager?.Settings.ShowNotifications ?? false)
                         {
                             _notificationManager.ShowDeviceChangeNotification(defaultDevice.FriendlyName);
-                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {defaultDevice.FriendlyName}");
                         }
                     }
                     else
@@ -187,7 +204,6 @@ namespace RoosterAudioSwitcher
                         if (_configManager?.Settings.ShowNotifications ?? false)
                         {
                             _notificationManager.ShowDeviceChangeNotification(thirdDevice.FriendlyName);
-                            _trayIconManager.ShowBalloonTip("Audio Device Changed", $"Now playing through: {thirdDevice.FriendlyName}");
                         }
                     }
                     else

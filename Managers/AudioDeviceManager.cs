@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using RoosterAudioSwitcher.Models;
 
 namespace RoosterAudioSwitcher.Managers
@@ -13,6 +14,7 @@ namespace RoosterAudioSwitcher.Managers
     public class AudioDeviceManager : IDisposable
     {
         private MMDeviceEnumerator? _deviceEnumerator;
+        private AudioDeviceNotificationClient? _notificationClient;
         private List<AudioDevice> _devices;
 
         /// <summary>
@@ -44,12 +46,24 @@ namespace RoosterAudioSwitcher.Managers
             {
                 _deviceEnumerator = new MMDeviceEnumerator();
 
-                // Note: We use a polling approach rather than IMMNotificationClient
-                // because device change notifications require COM event handling which is complex.
-                // The app can call RefreshDeviceList() periodically or on user interaction.
                 // Load initial device list
                 Logger.Log("InitializeDeviceEnumerator: MMDeviceEnumerator created successfully");
                 RefreshDeviceList();
+
+                // Register for endpoint notifications (devices added/removed, state
+                // changes, default device changes) so the tray menu stays current
+                // without manual refresh.
+                _notificationClient = new AudioDeviceNotificationClient(this);
+                int hr = _deviceEnumerator.RegisterEndpointNotificationCallback(_notificationClient);
+                if (hr == 0)
+                {
+                    Logger.Log("InitializeDeviceEnumerator: Endpoint notification client registered");
+                }
+                else
+                {
+                    Logger.LogError($"InitializeDeviceEnumerator: Failed to register endpoint notification client (HRESULT 0x{hr:X8})");
+                    _notificationClient = null;
+                }
             }
             catch (Exception ex)
             {
@@ -229,13 +243,81 @@ namespace RoosterAudioSwitcher.Managers
             if (list1.Count != list2.Count)
                 return false;
 
-            return list1.SequenceEqual(list2, new AudioDeviceIdComparer());
+            if (!list1.SequenceEqual(list2, new AudioDeviceIdComparer()))
+                return false;
+
+            // A change of the default device also counts as a change, so the tray
+            // menu's checkmark stays in sync when the default is changed outside
+            // this app (e.g. from the volume panel).
+            string? default1 = list1.FirstOrDefault(d => d.IsDefault)?.Id;
+            string? default2 = list2.FirstOrDefault(d => d.IsDefault)?.Id;
+            return string.Equals(default1, default2, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Called by the Core Audio notification client when endpoints change.
+        /// COM marshals the callback to the thread that registered the client
+        /// (the UI thread), so the refresh it triggers is safe to run alongside
+        /// the rest of the app.
+        /// </summary>
+        internal void OnEndpointNotification(string reason)
+        {
+            Logger.Log($"AudioDeviceManager: Endpoint notification ({reason}), refreshing device list");
+            RefreshDeviceList();
         }
 
         public void Dispose()
         {
+            try
+            {
+                if (_deviceEnumerator != null && _notificationClient != null)
+                {
+                    _deviceEnumerator.UnregisterEndpointNotificationCallback(_notificationClient);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("AudioDeviceManager: Error unregistering endpoint notification client", ex);
+            }
+            _notificationClient = null;
             _deviceEnumerator?.Dispose();
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Receives Core Audio endpoint notifications on behalf of
+        /// <see cref="AudioDeviceManager"/>. While registered, the COM layer keeps
+        /// the client alive and marshals callbacks to the registering (UI) thread.
+        /// </summary>
+        private sealed class AudioDeviceNotificationClient : IMMNotificationClient
+        {
+            private readonly AudioDeviceManager _owner;
+
+            public AudioDeviceNotificationClient(AudioDeviceManager owner)
+            {
+                _owner = owner;
+            }
+
+            public void OnDeviceStateChanged(string deviceId, DeviceState newState) =>
+                _owner.OnEndpointNotification($"state changed for device {deviceId}");
+
+            public void OnDeviceAdded(string pwstrDeviceId) =>
+                _owner.OnEndpointNotification($"device added: {pwstrDeviceId}");
+
+            public void OnDeviceRemoved(string deviceId) =>
+                _owner.OnEndpointNotification($"device removed: {deviceId}");
+
+            public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+            {
+                // Only the default playback (render) multimedia device is relevant here.
+                if (flow == DataFlow.Render && role == Role.Multimedia)
+                {
+                    _owner.OnEndpointNotification($"default playback device changed: {defaultDeviceId}");
+                }
+            }
+
+            public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key) =>
+                _owner.OnEndpointNotification($"property changed on device {pwstrDeviceId}");
         }
     }
 

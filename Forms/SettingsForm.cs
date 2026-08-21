@@ -83,6 +83,12 @@ namespace RoosterAudioSwitcher.Forms
         /// </summary>
         private void RefreshDeviceList()
         {
+            // Remember the current selections so a refresh does not clobber
+            // choices the user made but has not saved yet.
+            string? switchSelection = (cmbSwitchDevice!.SelectedItem as AudioDevice)?.Id;
+            string? defaultSelection = (cmbDefaultDevice!.SelectedItem as AudioDevice)?.Id;
+            string? thirdSelection = (cmbThirdDevice!.SelectedItem as AudioDevice)?.Id;
+
             lstDevices!.Items.Clear();
             cmbSwitchDevice!.Items.Clear();
             cmbDefaultDevice!.Items.Clear();
@@ -97,23 +103,26 @@ namespace RoosterAudioSwitcher.Forms
                 cmbThirdDevice.Items.Add(device);
             }
 
-            // Default selections if not yet configured
-            if (cmbSwitchDevice.Items.Count > 0 && cmbSwitchDevice.SelectedIndex < 0)
+            // Restore the pre-refresh selection if that device is still present;
+            // otherwise fall back to a sensible default selection.
+            if (!SelectComboByDeviceId(cmbSwitchDevice, switchSelection) &&
+                cmbSwitchDevice.Items.Count > 0 && cmbSwitchDevice.SelectedIndex < 0)
             {
                 cmbSwitchDevice.SelectedIndex = 0;
             }
 
-            var currentDefault = devices.Find(d => d.IsDefault);
-            if (currentDefault != null)
+            if (!SelectComboByDeviceId(cmbDefaultDevice, defaultSelection))
             {
-                SelectComboByDeviceId(cmbDefaultDevice, currentDefault.Id);
-            }
-            else if (cmbDefaultDevice.Items.Count > 0 && cmbDefaultDevice.SelectedIndex < 0)
-            {
-                cmbDefaultDevice.SelectedIndex = 0;
+                var currentDefault = devices.Find(d => d.IsDefault);
+                if (!SelectComboByDeviceId(cmbDefaultDevice, currentDefault?.Id) &&
+                    cmbDefaultDevice.Items.Count > 0 && cmbDefaultDevice.SelectedIndex < 0)
+                {
+                    cmbDefaultDevice.SelectedIndex = 0;
+                }
             }
 
-            if (cmbThirdDevice.Items.Count > 0 && cmbThirdDevice.SelectedIndex < 0)
+            if (!SelectComboByDeviceId(cmbThirdDevice, thirdSelection) &&
+                cmbThirdDevice.Items.Count > 0 && cmbThirdDevice.SelectedIndex < 0)
             {
                 cmbThirdDevice.SelectedIndex = 0;
             }
@@ -229,18 +238,21 @@ namespace RoosterAudioSwitcher.Forms
                 Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Run", true) ?? throw new InvalidOperationException("Could not open registry key");
 
-                // Validate the executable path before writing (prevent injection of malicious paths).
+                // Sanity-check the executable path before writing it to the registry.
                 if (!IsValidRegistryPath(exePath))
                 {
                     MessageBox.Show("Invalid application path. Cannot enable startup.", "Startup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                key.SetValue("RoosterAudioSwitcher", exePath);
+                // Run key values must be quoted when the path contains spaces,
+                // otherwise Windows cannot launch the app at startup.
+                string startupValue = exePath.Contains(' ') ? $"\"{exePath}\"" : exePath;
+                key.SetValue("RoosterAudioSwitcher", startupValue);
                 key.Close();
 
                 // Verify the registry value was written correctly.
-                if (!VerifyRegistryValue("RoosterAudioSwitcher", exePath))
+                if (!VerifyRegistryValue("RoosterAudioSwitcher", startupValue))
                 {
                     MessageBox.Show(
                         "Startup entry was created but could not be verified. The application may still start with Windows, but check your settings.",
@@ -346,11 +358,11 @@ namespace RoosterAudioSwitcher.Forms
             RefreshDeviceList();
         }
 
-        private void SelectComboByDeviceId(ComboBox? comboBox, string? deviceId)
+        private bool SelectComboByDeviceId(ComboBox? comboBox, string? deviceId)
         {
             if (comboBox == null || string.IsNullOrWhiteSpace(deviceId))
             {
-                return;
+                return false;
             }
 
             for (int i = 0; i < comboBox.Items.Count; i++)
@@ -358,9 +370,10 @@ namespace RoosterAudioSwitcher.Forms
                 if (comboBox.Items[i] is AudioDevice device && device.Id == deviceId)
                 {
                     comboBox.SelectedIndex = i;
-                    return;
+                    return true;
                 }
             }
+            return false;
         }
 
         /// <summary>

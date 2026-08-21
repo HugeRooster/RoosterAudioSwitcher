@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using RoosterAudioSwitcher.Models;
 
@@ -9,7 +8,7 @@ namespace RoosterAudioSwitcher.Managers
 {
     /// <summary>
     /// Manages loading and saving application settings to a JSON configuration file.
-    /// Config files are signed with HMAC-SHA256 (protected via DPAPI) to detect tampering or corruption.
+    /// Config files are signed with HMAC-SHA256 to detect corruption of the saved settings.
     /// </summary>
     public class ConfigManager
     {
@@ -57,7 +56,7 @@ namespace RoosterAudioSwitcher.Managers
                     string jsonContent;
                     if (!TryExtractAndVerifyHmac(rawContent, out jsonContent))
                     {
-                        Console.WriteLine("Config file integrity check failed. Using default settings.");
+                        Logger.LogWarning("Config file integrity check failed. Using default settings.");
                         return new Settings();
                     }
 
@@ -86,7 +85,7 @@ namespace RoosterAudioSwitcher.Managers
                 catch (Exception ex)
                 {
                     // If JSON is corrupted, log and use defaults
-                    Console.WriteLine($"Error loading config: {ex.Message}. Using default settings.");
+                    Logger.LogError($"Error loading config: {ex.Message}. Using default settings.");
                     return new Settings();
                 }
             }
@@ -96,30 +95,20 @@ namespace RoosterAudioSwitcher.Managers
         }
 
         /// <summary>
-        /// Extracts the HMAC signature from the last line of the raw config content and verifies it.
-        /// Returns the JSON content without the signature line on success.
+        /// Extracts the HMAC signature from the raw config content and verifies it.
+        /// On success, jsonContent holds the exact JSON string that was signed.
         /// </summary>
         private static bool TryExtractAndVerifyHmac(string rawContent, out string jsonContent)
         {
-            jsonContent = rawContent;
+            // File layout written by SaveSettings:
+            //   <json><newline>#HMAC:<hex><newline>
+            // Slice at the signature marker and take everything before it as the signed
+            // content. Slicing (rather than rejoining lines) guarantees the bytes we
+            // verify are byte-identical to the bytes we signed.
+            const string hmacMarker = "\n#HMAC:";
+            int markerIndex = rawContent.LastIndexOf(hmacMarker, StringComparison.Ordinal);
 
-            // Check if file ends with an HMAC comment line: #HMAC:<hex>
-            var lines = rawContent.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
-            int lastLineIndex = lines.Length - 1;
-
-            // Skip trailing empty lines to find the actual last content line
-            while (lastLineIndex >= 0 && string.IsNullOrWhiteSpace(lines[lastLineIndex]))
-            {
-                lastLineIndex--;
-            }
-
-            if (lastLineIndex < 0)
-                return false;
-
-            string lastLine = lines[lastLineIndex].Trim();
-            const string hmacPrefix = "#HMAC:";
-
-            if (!lastLine.StartsWith(hmacPrefix, StringComparison.Ordinal))
+            if (markerIndex < 0)
             {
                 // No HMAC signature present — treat as unsigned (legacy or first-run).
                 // Still try to parse the JSON.
@@ -127,29 +116,25 @@ namespace RoosterAudioSwitcher.Managers
                 return true;
             }
 
-            string storedHmac = lastLine.Substring(hmacPrefix.Length);
+            jsonContent = rawContent.Substring(0, markerIndex).TrimEnd();
+            string storedHmac = rawContent.Substring(markerIndex + hmacMarker.Length).Trim();
 
-            // Remove the HMAC line from content for deserialization
-            StringBuilder sb = new StringBuilder(rawContent.Length);
-            for (int i = 0; i <= lastLineIndex; i++)
-            {
-                sb.AppendLine(lines[i]);
-            }
-            jsonContent = sb.ToString().TrimEnd();
+            // A SHA256 HMAC is exactly 64 hex characters.
+            if (storedHmac.Length != 64)
+                return false;
 
             // Recompute HMAC over the JSON content and compare
             try
             {
-                byte[] key = GetDpapiProtectedKey();
-                byte[] computedHmac;
+                byte[] key = GetHmacKey();
+                string computedHex;
 
                 using (var hmac = new HMACSHA256(key))
                 {
-                    byte[] contentBytes = System.Text.Encoding.UTF8.GetBytes(jsonContent);
-                    computedHmac = hmac.ComputeHash(contentBytes);
+                    computedHex = Convert.ToHexString(
+                        hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(jsonContent)))
+                        .ToLowerInvariant();
                 }
-
-                string computedHex = BitConverter.ToString(computedHmac).Replace("-", "").ToLowerInvariant();
 
                 // Constant-time comparison to prevent timing attacks
                 return SecureEquals(storedHmac, computedHex);
@@ -162,31 +147,23 @@ namespace RoosterAudioSwitcher.Managers
         }
 
         /// <summary>
-        /// Computes a DPAPI-protected key derived from user-specific entropy.
-        /// The key is tied to the current Windows user account and application identity.
-        /// Falls back to a simple hash of a seed string if DPAPI is unavailable (e.g., non-Windows).
+        /// Derives the HMAC key from a fixed application seed.
+        ///
+        /// The key MUST be deterministic: the config is signed on save and verified on the
+        /// next launch, which runs in a different process. DPAPI (ProtectedData.Protect)
+        /// cannot be used for this — its ciphertext is randomized on every call (fresh IV),
+        /// so a DPAPI-derived key differs on every launch and every saved config would fail
+        /// verification, silently resetting the user's settings to defaults on every restart.
+        ///
+        /// Because the seed ships inside the application, this HMAC is an integrity
+        /// (corruption) check, not a tamper- or user-bound secret. That is appropriate for
+        /// this config, which stores no sensitive data.
         /// </summary>
-        private static byte[] GetDpapiProtectedKey()
+        private static byte[] GetHmacKey()
         {
-            try
-            {
-                // Use DPAPI to protect a seed value — only this user on this machine can decrypt it.
-                // We derive the actual HMAC key from the decrypted bytes via SHA256 for proper key size.
-                byte[] protectedBytes = ProtectedData.Protect(
-                    System.Text.Encoding.UTF8.GetBytes("RoosterAudioSwitcher-ConfigIntegritySeed"),
-                    null, // No additional entropy needed; user-scoped is sufficient
-                    DataProtectionScope.CurrentUser);
-
-                using var sha256 = SHA256.Create();
-                return sha256.ComputeHash(protectedBytes);
-            }
-            catch
-            {
-                // Fallback: derive key directly from a seed string.
-                // This provides integrity checking but without DPAPI's user/machine binding.
-                using var sha256 = SHA256.Create();
-                return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes("RoosterAudioSwitcher-ConfigIntegritySeed"));
-            }
+            const string seed = "RoosterAudioSwitcher-ConfigIntegritySeed";
+            using var sha256 = SHA256.Create();
+            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(seed));
         }
 
         /// <summary>
@@ -219,14 +196,14 @@ namespace RoosterAudioSwitcher.Managers
                 };
                 string json = JsonSerializer.Serialize(_settings, options);
 
-                // Compute HMAC signature over the JSON content
-                byte[] key = GetDpapiProtectedKey();
+                // Compute HMAC signature over the exact JSON content
+                byte[] key = GetHmacKey();
                 string hmacHex;
                 using (var hmac = new HMACSHA256(key))
                 {
-                    byte[] contentBytes = System.Text.Encoding.UTF8.GetBytes(json);
-                    byte[] computedHmac = hmac.ComputeHash(contentBytes);
-                    hmacHex = BitConverter.ToString(computedHmac).Replace("-", "").ToLowerInvariant();
+                    hmacHex = Convert.ToHexString(
+                        hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json)))
+                        .ToLowerInvariant();
                 }
 
                 // Write JSON followed by HMAC signature as a comment line.
@@ -236,7 +213,7 @@ namespace RoosterAudioSwitcher.Managers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving config: {ex.Message}");
+                Logger.LogError($"Error saving config: {ex.Message}");
             }
         }
 
