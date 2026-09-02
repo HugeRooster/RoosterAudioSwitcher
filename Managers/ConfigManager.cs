@@ -141,7 +141,7 @@ namespace RoosterAudioSwitcher.Managers
             }
             catch
             {
-                // If HMAC computation fails (e.g., DPAPI key unavailable), reject the file
+                // If HMAC computation fails, reject the file and fall back to defaults.
                 return false;
             }
         }
