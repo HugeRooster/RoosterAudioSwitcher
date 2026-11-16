@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -19,6 +20,8 @@ namespace RoosterAudioSwitcher
         private static NotificationManager? _notificationManager;
         private static ConfigManager? _configManager;
         private static SettingsForm? _settingsForm;
+        private static readonly HashSet<string> _reportedUnavailableDeviceIds =
+            new(StringComparer.OrdinalIgnoreCase);
 
         // Held for the lifetime of the process so the GC cannot release our
         // ownership of the single-instance mutex while the app is running.
@@ -86,6 +89,7 @@ namespace RoosterAudioSwitcher
                 // Load initial device list into tray menu
                 Logger.Log("Main: Updating tray menu...");
                 UpdateTrayMenu();
+                NotifyForUnavailableConfiguredDevices();
 
                 Logger.Log("Main: Running application...");
                 // Run the application
@@ -121,7 +125,17 @@ namespace RoosterAudioSwitcher
                 try
                 {
                     Logger.Log(">>> SWITCH HOTKEY HANDLER FIRED <<<");
-                    var targetDevice = ResolveDeviceById(_configManager?.Settings.SwitchToDeviceId);
+                    var settings = _configManager?.Settings;
+                    var targetDevice = settings == null
+                        ? null
+                        : ResolveConfiguredDevice(
+                            settings.SwitchToDeviceId,
+                            settings.SwitchToDeviceName,
+                            device =>
+                            {
+                                settings.SwitchToDeviceId = device.Id;
+                                settings.SwitchToDeviceName = device.FriendlyName;
+                            });
                     if (targetDevice == null)
                     {
                         Logger.LogError("Switch hotkey: target device is not configured or not found.");
@@ -155,7 +169,17 @@ namespace RoosterAudioSwitcher
                 try
                 {
                     Logger.Log(">>> RETURN HOTKEY HANDLER FIRED <<<");
-                    var defaultDevice = ResolveDeviceById(_configManager?.Settings.DefaultDeviceId);
+                    var settings = _configManager?.Settings;
+                    var defaultDevice = settings == null
+                        ? null
+                        : ResolveConfiguredDevice(
+                            settings.DefaultDeviceId,
+                            settings.DefaultDeviceName,
+                            device =>
+                            {
+                                settings.DefaultDeviceId = device.Id;
+                                settings.DefaultDeviceName = device.FriendlyName;
+                            });
                     if (defaultDevice == null)
                     {
                         Logger.LogError("Return hotkey: default device is not configured or not found.");
@@ -189,7 +213,17 @@ namespace RoosterAudioSwitcher
                 try
                 {
                     Logger.Log(">>> THIRD HOTKEY HANDLER FIRED <<<");
-                    var thirdDevice = ResolveDeviceById(_configManager?.Settings.ThirdDeviceId);
+                    var settings = _configManager?.Settings;
+                    var thirdDevice = settings == null
+                        ? null
+                        : ResolveConfiguredDevice(
+                            settings.ThirdDeviceId,
+                            settings.ThirdDeviceName,
+                            device =>
+                            {
+                                settings.ThirdDeviceId = device.Id;
+                                settings.ThirdDeviceName = device.FriendlyName;
+                            });
                     if (thirdDevice == null)
                     {
                         Logger.LogError("Third hotkey: third device is not configured or not found.");
@@ -222,6 +256,7 @@ namespace RoosterAudioSwitcher
             {
                 Logger.Log("DevicesChanged event fired");
                 UpdateTrayMenu();
+                NotifyForUnavailableConfiguredDevices();
             };
 
             // Tray menu: Settings clicked
@@ -304,6 +339,7 @@ namespace RoosterAudioSwitcher
             }
 
             _settingsForm.ShowDialog();
+            NotifyForUnavailableConfiguredDevices();
         }
 
         /// <summary>
@@ -320,14 +356,116 @@ namespace RoosterAudioSwitcher
             Logger.Log("=== RoosterAudioSwitcher Stopped ===");
         }
 
-        private static Models.AudioDevice? ResolveDeviceById(string? deviceId)
+        private static Models.AudioDevice? ResolveConfiguredDevice(
+            string? deviceId,
+            string? friendlyName,
+            Action<Models.AudioDevice> updateConfiguration)
         {
             if (string.IsNullOrWhiteSpace(deviceId) || _audioDeviceManager == null)
             {
                 return null;
             }
 
-            return _audioDeviceManager.GetDevices().FirstOrDefault(d => d.Id == deviceId);
+            var devices = _audioDeviceManager.GetDevices();
+            var deviceById = devices.FirstOrDefault(d =>
+                string.Equals(d.Id, deviceId, StringComparison.OrdinalIgnoreCase));
+            if (deviceById != null)
+            {
+                if (!string.Equals(
+                    deviceById.FriendlyName,
+                    friendlyName,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    updateConfiguration(deviceById);
+                    _configManager?.SaveSettings();
+                }
+
+                return deviceById;
+            }
+
+            if (string.IsNullOrWhiteSpace(friendlyName))
+            {
+                return null;
+            }
+
+            var nameMatches = devices
+                .Where(d => string.Equals(d.FriendlyName, friendlyName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (nameMatches.Count != 1)
+            {
+                if (nameMatches.Count > 1)
+                {
+                    Logger.LogWarning(
+                        $"Configured device ID {deviceId} is unavailable and friendly name '{friendlyName}' matches multiple devices; leaving the saved ID unchanged.");
+                }
+
+                return null;
+            }
+
+            var replacement = nameMatches[0];
+            updateConfiguration(replacement);
+            _configManager?.SaveSettings();
+            Logger.Log(
+                $"Reidentified configured device '{friendlyName}' with new ID {replacement.Id}.");
+            return replacement;
+        }
+
+        private static void NotifyForUnavailableConfiguredDevices()
+        {
+            if (_configManager == null || _audioDeviceManager == null || _notificationManager == null)
+            {
+                return;
+            }
+
+            var settings = _configManager.Settings;
+            var configuredDevices = new[]
+            {
+                (Label: "Switch-to", Id: settings.SwitchToDeviceId, Name: settings.SwitchToDeviceName,
+                    Update: (Action<Models.AudioDevice>)(device =>
+                    {
+                        settings.SwitchToDeviceId = device.Id;
+                        settings.SwitchToDeviceName = device.FriendlyName;
+                    })),
+                (Label: "Default", Id: settings.DefaultDeviceId, Name: settings.DefaultDeviceName,
+                    Update: (Action<Models.AudioDevice>)(device =>
+                    {
+                        settings.DefaultDeviceId = device.Id;
+                        settings.DefaultDeviceName = device.FriendlyName;
+                    })),
+                (Label: "Third", Id: settings.ThirdDeviceId, Name: settings.ThirdDeviceName,
+                    Update: (Action<Models.AudioDevice>)(device =>
+                    {
+                        settings.ThirdDeviceId = device.Id;
+                        settings.ThirdDeviceName = device.FriendlyName;
+                    }))
+            };
+            var unavailable = configuredDevices
+                .Where(device => !string.IsNullOrWhiteSpace(device.Id) &&
+                    ResolveConfiguredDevice(device.Id, device.Name, device.Update) == null)
+                .ToList();
+            var unavailableIds = new HashSet<string>(
+                unavailable.Select(device => device.Id!),
+                StringComparer.OrdinalIgnoreCase);
+
+            _reportedUnavailableDeviceIds.IntersectWith(unavailableIds);
+            var newlyUnavailable = unavailable
+                .Where(device => !_reportedUnavailableDeviceIds.Contains(device.Id!))
+                .ToList();
+
+            if (newlyUnavailable.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var device in newlyUnavailable)
+            {
+                _reportedUnavailableDeviceIds.Add(device.Id!);
+            }
+
+            string labels = string.Join(", ", newlyUnavailable.Select(device => device.Label).Distinct());
+            _notificationManager.ShowNotification(
+                "Configured audio device unavailable",
+                $"{labels} device not found. Reconnect it or choose a replacement in Settings.");
         }
     }
 }

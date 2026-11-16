@@ -74,10 +74,19 @@ Important settings keys:
 - ReturnToDefaultHotKey
 - ThirdDeviceHotKey
 - SwitchToDeviceId
+- SwitchToDeviceName
 - DefaultDeviceId
+- DefaultDeviceName
 - ThirdDeviceId
+- ThirdDeviceName
 - ShowNotifications
 - StartWithWindows
+
+Device IDs are Windows audio endpoint IDs. If a configured endpoint is temporarily
+unavailable, Settings keeps its selection marked as unavailable instead of replacing
+it with another device. The saved friendly names are used to recover from a changed
+endpoint ID only when exactly one available device matches, avoiding ambiguous
+automatic reassignment.
 
 ## Project Structure
 

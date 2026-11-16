@@ -85,47 +85,117 @@ namespace RoosterAudioSwitcher.Forms
         {
             // Remember the current selections so a refresh does not clobber
             // choices the user made but has not saved yet.
-            string? switchSelection = (cmbSwitchDevice!.SelectedItem as AudioDevice)?.Id;
-            string? defaultSelection = (cmbDefaultDevice!.SelectedItem as AudioDevice)?.Id;
-            string? thirdSelection = (cmbThirdDevice!.SelectedItem as AudioDevice)?.Id;
+            AudioDevice? switchSelection = cmbSwitchDevice!.SelectedItem as AudioDevice;
+            AudioDevice? defaultSelection = cmbDefaultDevice!.SelectedItem as AudioDevice;
+            AudioDevice? thirdSelection = cmbThirdDevice!.SelectedItem as AudioDevice;
 
             lstDevices!.Items.Clear();
-            cmbSwitchDevice!.Items.Clear();
-            cmbDefaultDevice!.Items.Clear();
-            cmbThirdDevice!.Items.Clear();
             var devices = _audioDeviceManager.GetDevices();
 
             foreach (var device in devices)
             {
                 lstDevices.Items.Add(device);
-                cmbSwitchDevice.Items.Add(device);
-                cmbDefaultDevice.Items.Add(device);
-                cmbThirdDevice.Items.Add(device);
             }
 
-            // Restore the pre-refresh selection if that device is still present;
-            // otherwise fall back to a sensible default selection.
-            if (!SelectComboByDeviceId(cmbSwitchDevice, switchSelection) &&
-                cmbSwitchDevice.Items.Count > 0 && cmbSwitchDevice.SelectedIndex < 0)
+            PopulateDeviceCombo(
+                cmbSwitchDevice,
+                devices,
+                switchSelection,
+                _configManager.Settings.SwitchToDeviceId,
+                _configManager.Settings.SwitchToDeviceName,
+                "Switch-to");
+            PopulateDeviceCombo(
+                cmbDefaultDevice,
+                devices,
+                defaultSelection,
+                _configManager.Settings.DefaultDeviceId,
+                _configManager.Settings.DefaultDeviceName,
+                "Default",
+                devices.Find(d => d.IsDefault)?.Id);
+            PopulateDeviceCombo(
+                cmbThirdDevice,
+                devices,
+                thirdSelection,
+                _configManager.Settings.ThirdDeviceId,
+                _configManager.Settings.ThirdDeviceName,
+                "Third");
+        }
+
+        private static void PopulateDeviceCombo(
+            ComboBox comboBox,
+            System.Collections.Generic.List<AudioDevice> devices,
+            AudioDevice? previousSelection,
+            string? savedDeviceId,
+            string? savedDeviceName,
+            string deviceLabel,
+            string? fallbackDeviceId = null)
+        {
+            comboBox.Items.Clear();
+
+            foreach (var device in devices)
             {
-                cmbSwitchDevice.SelectedIndex = 0;
+                comboBox.Items.Add(device);
             }
 
-            if (!SelectComboByDeviceId(cmbDefaultDevice, defaultSelection))
+            AddUnavailableSelection(comboBox, previousSelection, deviceLabel);
+            if (!string.IsNullOrWhiteSpace(savedDeviceId) &&
+                !ContainsDeviceId(comboBox, savedDeviceId))
             {
-                var currentDefault = devices.Find(d => d.IsDefault);
-                if (!SelectComboByDeviceId(cmbDefaultDevice, currentDefault?.Id) &&
-                    cmbDefaultDevice.Items.Count > 0 && cmbDefaultDevice.SelectedIndex < 0)
+                comboBox.Items.Add(new AudioDevice
                 {
-                    cmbDefaultDevice.SelectedIndex = 0;
+                    Id = savedDeviceId,
+                    FriendlyName = string.IsNullOrWhiteSpace(savedDeviceName)
+                        ? $"{deviceLabel} device"
+                        : savedDeviceName,
+                    IsAvailable = false
+                });
+            }
+
+            string? preferredId = previousSelection?.Id ?? savedDeviceId ?? fallbackDeviceId;
+            if (SelectComboByDeviceId(comboBox, preferredId))
+            {
+                return;
+            }
+
+            if (comboBox.Items.Count > 0)
+            {
+                comboBox.SelectedIndex = 0;
+            }
+        }
+
+        private static void AddUnavailableSelection(
+            ComboBox comboBox,
+            AudioDevice? previousSelection,
+            string deviceLabel)
+        {
+            if (previousSelection == null ||
+                ContainsDeviceId(comboBox, previousSelection.Id))
+            {
+                return;
+            }
+
+            comboBox.Items.Add(new AudioDevice
+            {
+                Id = previousSelection.Id,
+                FriendlyName = previousSelection.IsAvailable
+                    ? previousSelection.FriendlyName
+                    : deviceLabel + " device",
+                IsAvailable = false
+            });
+        }
+
+        private static bool ContainsDeviceId(ComboBox comboBox, string deviceId)
+        {
+            for (int i = 0; i < comboBox.Items.Count; i++)
+            {
+                if (comboBox.Items[i] is AudioDevice device &&
+                    string.Equals(device.Id, deviceId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
                 }
             }
 
-            if (!SelectComboByDeviceId(cmbThirdDevice, thirdSelection) &&
-                cmbThirdDevice.Items.Count > 0 && cmbThirdDevice.SelectedIndex < 0)
-            {
-                cmbThirdDevice.SelectedIndex = 0;
-            }
+            return false;
         }
 
         /// <summary>
@@ -194,8 +264,32 @@ namespace RoosterAudioSwitcher.Forms
             _configManager.Settings.ReturnToDefaultHotKey = returnHotKey;
             _configManager.Settings.ThirdDeviceHotKey = thirdHotKey;
             _configManager.Settings.HotKey = switchHotKey;
+            if (switchDevice.IsAvailable ||
+                !string.Equals(
+                    switchDevice.Id,
+                    _configManager.Settings.SwitchToDeviceId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _configManager.Settings.SwitchToDeviceName = switchDevice.FriendlyName;
+            }
             _configManager.Settings.SwitchToDeviceId = switchDevice.Id;
+            if (defaultDevice.IsAvailable ||
+                !string.Equals(
+                    defaultDevice.Id,
+                    _configManager.Settings.DefaultDeviceId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _configManager.Settings.DefaultDeviceName = defaultDevice.FriendlyName;
+            }
             _configManager.Settings.DefaultDeviceId = defaultDevice.Id;
+            if (thirdDevice.IsAvailable ||
+                !string.Equals(
+                    thirdDevice.Id,
+                    _configManager.Settings.ThirdDeviceId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _configManager.Settings.ThirdDeviceName = thirdDevice.FriendlyName;
+            }
             _configManager.Settings.ThirdDeviceId = thirdDevice.Id;
             _configManager.Settings.StartWithWindows = chkStartWithWindows?.Checked ?? false;
             _configManager.Settings.ShowNotifications = chkShowNotifications?.Checked ?? false;
@@ -358,7 +452,7 @@ namespace RoosterAudioSwitcher.Forms
             RefreshDeviceList();
         }
 
-        private bool SelectComboByDeviceId(ComboBox? comboBox, string? deviceId)
+        private static bool SelectComboByDeviceId(ComboBox? comboBox, string? deviceId)
         {
             if (comboBox == null || string.IsNullOrWhiteSpace(deviceId))
             {
@@ -367,7 +461,8 @@ namespace RoosterAudioSwitcher.Forms
 
             for (int i = 0; i < comboBox.Items.Count; i++)
             {
-                if (comboBox.Items[i] is AudioDevice device && device.Id == deviceId)
+                if (comboBox.Items[i] is AudioDevice device &&
+                    string.Equals(device.Id, deviceId, StringComparison.OrdinalIgnoreCase))
                 {
                     comboBox.SelectedIndex = i;
                     return true;

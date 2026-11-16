@@ -32,7 +32,15 @@ namespace RoosterAudioSwitcher.Models
         /// </summary>
         public string? DeviceType { get; set; }
 
-        public override string ToString() => IsDefault ? $"{FriendlyName} (Default)" : FriendlyName;
+        public override string ToString()
+        {
+            if (!IsAvailable)
+            {
+                return $"{FriendlyName} (Unavailable)";
+            }
+
+            return IsDefault ? $"{FriendlyName} (Default)" : FriendlyName;
+        }
 
         public override bool Equals(object? obj) =>
             obj is AudioDevice device && device.Id == Id;
